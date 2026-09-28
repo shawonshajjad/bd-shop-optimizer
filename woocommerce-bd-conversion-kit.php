@@ -39,11 +39,14 @@ add_action('woocommerce_before_add_to_cart_button',function(){
  foreach(wbd_sizes() as $size){ if(!array_key_exists($size,$stocks)) continue; $qty=absint($stocks[$size]); printf('<option value="%s"%s>%s%s</option>',esc_attr($size),disabled(0,$qty,false),esc_html($size),0===$qty?' '.esc_html__('(Out of stock)','woocommerce-bd-conversion-kit'):''); }
  echo '</select></div>';
 });
+add_filter('woocommerce_product_add_to_cart_url',function($url,$product){ return ($product&&$product->is_type('simple')&&wbd_stock($product->get_id()))?$product->get_permalink():$url; },10,2);
+add_filter('woocommerce_product_add_to_cart_text',function($text,$product){ return ($product&&$product->is_type('simple')&&wbd_stock($product->get_id()))?__('Select Size','woocommerce-bd-conversion-kit'):$text; },10,2);
+add_filter('woocommerce_loop_add_to_cart_args',function($args,$product){ if($product&&$product->is_type('simple')&&wbd_stock($product->get_id())&&isset($args['class']))$args['class']=trim(str_replace('ajax_add_to_cart','',$args['class'])); return $args; },10,2);
 add_filter('woocommerce_add_to_cart_validation',function($passed,$product_id,$quantity){
  $product=wc_get_product($product_id); if(!$product||!$product->is_type('simple')) return $passed; $stocks=wbd_stock($product_id); if(!$stocks) return $passed;
  $size=isset($_POST['custom_size'])?sanitize_text_field(wp_unslash($_POST['custom_size'])):'';
  if(!in_array($size,wbd_sizes(),true)||!array_key_exists($size,$stocks)){ wc_add_notice(__('Please select a valid size.','woocommerce-bd-conversion-kit'),'error'); return false; }
- if(absint($stocks[$size])<absint($quantity)){ wc_add_notice(__('The selected size does not have enough stock.','woocommerce-bd-conversion-kit'),'error'); return false; }
+ $requested=absint($quantity); if(WC()->cart){ foreach(WC()->cart->get_cart() as $item){ if(absint($item['product_id'])===absint($product_id)&&isset($item['custom_size'])&&$item['custom_size']===$size)$requested+=absint($item['quantity']); } } if(absint($stocks[$size])<$requested){ wc_add_notice(__('The selected size does not have enough stock.','woocommerce-bd-conversion-kit'),'error'); return false; }
  return $passed;
 },10,3);
 add_filter('woocommerce_add_cart_item_data',function($data,$product_id){
